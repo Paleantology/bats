@@ -1,0 +1,79 @@
+---
+title: "Bates"
+author: "April Wright"
+date: '2022-07-21'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The first thing we need to do with this dataset is make sure the row labels and the tree tips are aligned. We'll use the package `treedata.table`, which automates many tree managemend functions for this.
+
+```{r}
+library(tidyverse)
+library(treedata.table)
+library(ape)
+```
+
+Our trait data need to be in a dataframe, and our trees must be read in as a `Multiphylo` data type.
+
+```{r}
+
+trees <- ape::read.nexus("trees/output.nex")
+df <- read_delim("data/Bat Migration Phylogeny - All Species_Filled_woCite.tsv")
+small_dat <- df %>%
+  select(speciesName, migratory.sedentary)
+sd <- as.data.frame(small_dat)
+````
+
+Then, the tree and data objects can be merged together for use with downstream comparative methods.
+
+```{r}
+td <- as.treedata.table(tree = trees, data = sd, name_column = "speciesName")
+```
+
+This will result in a few tips being pruned from the tree, as they do not have data.
+
+
+Next, we will use `Revticulate` to run our scripts.
+
+```{R}
+library(Revticulate)
+callRevFromTerminal("scripts/mcmc_ase_ERM.Rev")
+
+```
+
+Next, we will plot these states on the tree
+
+```{r}
+
+CHARACTER <- "migration status"
+NUM_STATES <- 2
+
+STATE_LABELS <- c("0" = "Sedentary", "1" = "Migratory")
+
+treefile <- paste0("output/migration_ase_ERM.tree")
+
+ase <- processAncStates(treefile,
+                        # Specify state labels.
+                        # These numbers correspond to
+                        # your input data file.
+                        state_labels = STATE_LABELS)
+
+
+plotAncStatesPie(t = ase, 
+                 tree_layout = "rectangular") + 
+    # modify legend location using ggplot2
+    theme(legend.position = c(1.15,0.41))
+
+```
+
+Now, let's do the free state estimation. This allows the forward and backward transition rates to vary.
+
+```{R}
+library(Revticulate)
+callRevFromTerminal("scripts/mcmc_ase_freeK.Rev")
+
+```
