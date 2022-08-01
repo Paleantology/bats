@@ -222,7 +222,7 @@ STATE_LABELS <- c("0" = "Sedentary", "1" = "Migratory")
   with_traits <- full_join(single_tree, x, by="label")
   p <- ggtree(with_traits, aes(color=anc_state_1_pp)) %<+% df
   pp <- p +scale_color_continuous(low ="red", high="darkblue")
-
+  pp + geom_tippoint(pch=16, size=4, color=migratory.sedentary)
     outfile <- paste0(treefile, "branchcolor", ".png")
     ggsave(filename = outfile, plot = plt, dpi = "retina")
     i <- i + 1
