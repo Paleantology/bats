@@ -15,6 +15,8 @@ The first thing we need to do with this dataset is make sure the row labels and 
 library(tidyverse)
 library(treedata.table)
 library(ape)
+library(RevGadgets)
+library(treeio)
 ```
 
 Our trait data need to be in a dataframe, and our trees must be read in as a `Multiphylo` data type.
@@ -54,7 +56,7 @@ CHARACTER <- "migration status"
 NUM_STATES <- 2
 i <- 1
 
-while (i < 100){
+while (i < 1){
 STATE_LABELS <- c("0" = "Sedentary", "1" = "Migratory")
 
 #treefile <- paste0("output/erm/migration",i,  "_ase_ERM.tree")
@@ -80,7 +82,7 @@ plt <- plotAncStatesMAP(t = ase,
     ggsave(filename = outfile, plot = plt, dpi = "retina")
     i <- i + 1
 }
-
+plt
 ```
 
 ```{r}
@@ -90,7 +92,7 @@ CHARACTER <- "migration status"
 NUM_STATES <- 2
 i <- 1
 
-while (i < 100){
+while (i < 1){
 STATE_LABELS <- c("0" = "Sedentary", "1" = "Migratory")
 
   treefile <- paste0("output/erm/migration",i,  "_ase_ERM.tree")
@@ -102,13 +104,14 @@ STATE_LABELS <- c("0" = "Sedentary", "1" = "Migratory")
   trait <- td$dat
   x <- tibble(label = as.phylo(single_tree)$tip.label, trait = trait)
   with_traits <- full_join(single_tree, x, by="label")
-  p <- ggtree(with_traits, aes(color=anc_state_1_pp)) + scale_color_continuous(low ="red", high="darkblue") + geom_tippoint(data = 
-with_traits@extraInfo)
-    outfile <- paste0(treefile, "branchcolor", ".png")
-    ggsave(filename = outfile, plot = plt, dpi = "retina")
+  p <- ggtree(with_traits, aes(color=anc_state_1_pp)) + scale_color_continuous(low ="red", high="darkblue") + geom_tippoint(data = with_traits@extraInfo)
+  p
+#    outfile <- paste0(treefile, "branchcolor", ".png")
+#    ggsave(filename = outfile, plot = plt, dpi = "retina")
     i <- i + 1
 }
 
+p
 ```
 
 
@@ -131,7 +134,7 @@ Then, rerun the RevScripts, taking as input the single consensus tree.
 
 To extract the rates of back and forward transitions and summarize across files:
 
-```{r}
+```{r include=FALSE}
 
 library(tidyverse)
 
@@ -143,7 +146,7 @@ while ( i < 100){
   dat <- read_delim(log, delim ="\t")
   dat <- dat %>% 
     drop_na()
-  means <- c(means, mean(dat$Posterior))
+  means <- c(means, mean(dat$`rate[1]`))
 
 #  means <- c(means, mean(dat$`rate[1]`))
   i <- i+1
@@ -154,12 +157,12 @@ Next, we want to plot these data.
 
 ```{r}
 df <- as.data.frame(means, means)
- plt <- ggplot(df, mapping=aes(x = means)) + geom_histogram() + ylab("Count") + xlab("Posterior") + ggtitle("One-Rate Model") + geom_vline(xintercept = -1602.888)
-ggsave(plt, filename = "posterior_one-rate.pdf")
+ plt <- ggplot(df, mapping=aes(x = means)) + geom_histogram() + ylab("Count") + xlab("Posterior") + ggtitle("One-Rate Model")  + geom_vline(xintercept = 1.35) #+ geom_vline(xintercept = -1602.888)
+ggsave(plt, filename = "rate_one-rate.pdf")
 ```
 
 We also want to do this for the two-rate model. 
-```{r}
+```{r include=FALSE}
 
 library(tidyverse)
 
@@ -172,15 +175,16 @@ while ( i < 89){
   dat <- read_delim(log, delim ="\t")
   dat <- dat %>% 
     drop_na()
-   means <- c(means, mean(dat$Posterior))
+   means_forward <- c(means_forward, mean(dat$`rate[1]`))
+  means_backward <- c(means_backward, mean(dat$`rate[2]`))
+#   means <- c(means, mean(dat$Posterior))
 df <- as.data.frame(means)
-#  means_forward <- c(means_forward, mean(dat$`rate[1]`))
- # means_backward <- c(means_backward, mean(dat$`rate[2]`))
+
 
   i <- i+1
 }
 
- plt <- ggplot(df, mapping=aes(x = means)) + geom_histogram() + ylab("Count") + xlab("Posterior") + ggtitle("Two-Rate Model") + geom_vline(xintercept = -967.01)
+ plt <- ggplot(df, mapping=aes(x = means)) + geom_histogram() + ylab("Count") + xlab("Posterior") + ggtitle("Two-Rate Model") + geom_vline(xintercept =  c(1.14,2.719 ))
 ggsave(plt, filename = "posterior_two-rate.pdf")
 ```
 
@@ -197,7 +201,7 @@ colnames(df_back) <- "means"
 df_back <- df_back %>% 
   mutate(Rate = "Backward")  
 df_rates <- rbind(df_forward, df_back)
-plt <- ggplot(df_rates, mapping=aes(x = means, fill = Rate)) + geom_histogram(alpha = .75) + ylab("Count") + xlab("Rate of Transition") + ggtitle("Two-Rate Model") +theme_bw()
+plt <- ggplot(df_rates, mapping=aes(x = means, fill = Rate)) + geom_histogram(alpha = .75) + ylab("Count") + xlab("Rate of Transition") + ggtitle("Two-Rate Model") +theme_bw() + geom_vline(xintercept = c(1.14,2.719 ) )
 ```
 
 ## Include tip colors: 
@@ -211,19 +215,147 @@ i <- 1
 while (i < 100){
 STATE_LABELS <- c("0" = "Sedentary", "1" = "Migratory")
 
-  treefile <- paste0("output/erm/migration",i,  "_ase_ERM.tree")
+  treefile <- paste0("output/freek/solitariness",i,  "_ase_freek.tree")
  # treefile <- paste0("output/freek/solitariness",i,  "_ase_freeK.tree")
   tree_sample <- readTrees(paths = treefile)
   single_tree <- tree_sample[[1]][[1]]
 
   single_tree@data$anc_state_1_pp <-as.double(single_tree@data$anc_state_1_pp)
+  single_tree@data$anc_state_2_pp <-as.double(single_tree@data$anc_state_2_pp)
+
   trait <- td$dat
   x <- tibble(label = as.phylo(single_tree)$tip.label, trait = trait)
   with_traits <- full_join(single_tree, x, by="label")
-  p <- ggtree(with_traits, aes(color=anc_state_1_pp)) %<+% df
-  pp <- p +scale_color_continuous(low ="red", high="darkblue")
-  pp + geom_tippoint(pch=16, size=4, color=migratory.sedentary)
-    outfile <- paste0(treefile, "branchcolor", ".png")
+  
+  p <- ggtree(with_traits, aes(color=anc_state_1_pp, size = (anc_state_2_pp))) %<+% df
+  pp <- p + scale_color_continuous(low ="red", high="darkblue")                                + scale_size_continuous(range = c(0.2, 1))
+   plt <- pp + geom_tippoint(aes(fill=migratory.sedentary), pch=22, size=4)                       + scale_fill_manual(values = c("migratory" = "red", "sedentary" =                                                   "darkblue"))   +
+              geom_tiplab2(hjust=2)
+    outfile <- paste0(treefile, "tipcolor", ".png")
     ggsave(filename = outfile, plot = plt, dpi = "retina")
     i <- i + 1
 }
+```
+
+
+## Subsets: 
+```{r}
+
+library(ggplot2)
+CHARACTER <- "migration status"
+NUM_STATES <- 2
+i <- 1
+
+while (i < 100){
+STATE_LABELS <- c("0" = "Sedentary", "1" = "Migratory")
+
+  treefile <- paste0("output/freek/solitariness",i,  "_ase_freek.tree")
+ # treefile <- paste0("output/freek/solitariness",i,  "_ase_freeK.tree")
+  tree_sample <- readTrees(paths = treefile)
+  single_tree <- tree_sample[[1]][[1]]
+
+  single_tree@data$anc_state_1_pp <-as.double(single_tree@data$anc_state_1_pp)
+  single_tree@data$anc_state_2_pp <-as.double(single_tree@data$anc_state_2_pp)
+
+  trait <- td$dat
+  x <- tibble(label = as.phylo(single_tree)$tip.label, trait = trait) 
+  with_traits <- full_join(single_tree, x, by="label")
+  
+  t <- tree_subset(single_tree, 675)
+  p <- ggtree(single_tree, aes(color=anc_state_1_pp, size = (anc_state_2_pp))) %<+% trait
+  pp <- p + scale_color_continuous(low ="red", high="darkblue")                                + scale_size_continuous(range = c(0.2, 1))
+   plt <- pp + geom_tippoint(mapping = aes(fill=migratory.sedentary), pch=22, size=4)                       + scale_fill_manual(values = c("migratory" = "red", "sedentary" =                                                   "blue"))   +
+              geom_tiplab( geom = "text", offset = 2, size = .75)
+    outfile <- paste0(treefile, "tipcolor", ".png")
+    ggsave(filename = outfile, plot = plt, dpi = "retina")
+    i <- i + 1
+}
+```
+
+
+
+```{r}
+
+  trait <- td$dat
+  x <- tibble(label = as.phylo(single_tree)$tip.label, trait = trait)
+  with_traits <- full_join(single_tree, x, by="label")
+  t <- tree_subset(with_traits, 1242)
+
+  t@data$anc_state_1_pp[1:79] <-      t@extraInfo$trait$migratory.sedentary[1:79]
+  
+  t@data$anc_state_1_pp[t@data$anc_state_1_pp == "sedentary"] <- 1
+  t@data$anc_state_1_pp[t@data$anc_state_1_pp == "migratory"] <- 0
+
+  t@data$anc_state_1_pp <-as.double(t@data$anc_state_1_pp)
+  t@data$anc_state_2_pp <-as.double(t@data$anc_state_2_pp)
+
+  p <- ggtree(t, aes(color=anc_state_1_pp, size = (anc_state_2_pp))) 
+  pp <- p + scale_color_continuous(low ="red", high="darkblue")                                + scale_size_continuous(range = c(0.2, 1))
+   plt <- pp + geom_tippoint(mapping = aes(fill=t@data$anc_state_1_pp), pch=22, size=4) 
+   
+   
+   + scale_fill_manual(values = c("migratory" = "red", "sedentary" =                                                   "blue"))   +
+              geom_tiplab( geom = "text", offset = 2, size = .75)
+
+```
+
+115
+833
+447
+1242
+
+```{r}
+
+#Vespertillionids
+t <- tree_subset(with_traits, 1242)
+
+t@data$anc_state_1_pp[1:592 ] <- t@extraInfo$trait$migratory.sedentary[1:592]
+t@data$anc_state_1_pp[1:592 ] <- t@extraInfo$trait$migratory.sedentary[1:592 ]
+t@data$anc_state_1_pp[1:592 ][t@data$anc_state_1_pp[1:592 ] == "migratory"] <- 0
+t@data$anc_state_1_pp[1:592 ][t@data$anc_state_1_pp[1:592 ] == "sedentary"] <- 1
+t@data$anc_state_1_pp <-as.double(t@data$anc_state_1_pp)
+t@data$anc_state_2_pp <-as.double(t@data$anc_state_2_pp)
+phytools::plotBranchbyTrait(t@phylo,t@data$anc_state_1_pp,method="nodes", palette=colors, type = "fan", edge.width=.5, cex=0.2, legend=FALSE)
+
+```
+
+#Whole Tree
+
+```{r}
+colors <- colorRampPalette(c("red", "blue"))
+
+CHARACTER <- "migration status"
+NUM_STATES <- 2
+i <- 1
+
+while (i < 100){
+STATE_LABELS <- c("0" = "Sedentary", "1" = "Migratory")
+
+  treefile <- paste0("output/freek/solitariness",i,  "_ase_freek.tree")
+ # treefile <- paste0("output/freek/solitariness",i,  "_ase_freeK.tree")
+  tree_sample <- readTrees(paths = treefile)
+  single_tree <- tree_sample[[1]][[1]]
+
+    single_tree@data$anc_state_1_pp <-as.double(single_tree@data$anc_state_1_pp)
+  single_tree@data$anc_state_2_pp <-as.double(single_tree@data$anc_state_2_pp)
+
+  trait <- td$dat
+  x <- tibble(label = as.phylo(single_tree)$tip.label, trait = trait) 
+  with_traits <- full_join(single_tree, x, by="label")
+  
+
+with_traits@data$anc_state_1_pp[1:1286] <-      with_traits@extraInfo$trait$migratory.sedentary[1:1286]
+  
+with_traits@data$anc_state_1_pp[with_traits@data$anc_state_1_pp == "sedentary"] <- 1
+with_traits@data$anc_state_1_pp[with_traits@data$anc_state_1_pp == "migratory"] <- 0
+
+with_traits@data$anc_state_1_pp <-as.double(with_traits@data$anc_state_1_pp)
+with_traits@data$anc_state_2_pp <-as.double(with_traits@data$anc_state_2_pp)
+
+    outfile <- paste0(treefile, "Vesper", ".png")
+    png(filename = outfile)
+    phytools::plotBranchbyTrait(with_traits@phylo, with_traits@data$anc_state_1_pp,method="nodes", palette=colors, type = "fan", show.tip.label = TRUE, edge.width=.5, cex=.2, legend=FALSE)
+    dev.off()
+    i <- i + 1
+}
+```
